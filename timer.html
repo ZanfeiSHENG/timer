@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple Timer with Notification</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f0f0f0;
+    }
+    #timer {
+      font-size: 5rem;
+      margin-bottom: 20px;
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: white;
+      transition: background-color 0.2s;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    button:disabled {
+      background-color: #999;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <div id="timer">00:00</div>
+  <div class="controls">
+    <button data-minutes="25">Start 25:00</button>
+    <button data-minutes="5">Start 5:00</button>
+    <button data-seconds="5">Start 5s</button>
+    <button id="stopBtn" disabled>Stop</button>
+  </div>
+
+  <script>
+    let intervalId;
+    let remainingSeconds = 0;
+
+    const timerDisplay = document.getElementById('timer');
+    const buttons = document.querySelectorAll('button[data-minutes], button[data-seconds]');
+    const stopBtn = document.getElementById('stopBtn');
+
+    // 请求通知权限
+    document.addEventListener('DOMContentLoaded', () => {
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        Notification.requestPermission();
+      }
+    });
+
+    // 播放蜂鸣声
+    function playBeep(duration = 500, frequency = 440, volume = 1) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        oscillator.frequency.value = frequency;
+        oscillator.type = 'sine';
+        gainNode.gain.value = volume;
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        oscillator.start();
+        setTimeout(() => {
+          oscillator.stop();
+          ctx.close();
+        }, duration);
+      } catch (e) {
+        console.warn('Web Audio API not supported:', e);
+      }
+    }
+
+    function notifyUser() {
+      // 修改为播放 3 秒蜂鸣声
+      playBeep(3000, 440, 0.5);
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('⏰ Time is up!', { body: 'Your timer has finished.' });
+      } else {
+        alert('Time is up!');
+      }
+    }
+
+    function startTimer(totalSeconds) {
+      clearInterval(intervalId);
+      remainingSeconds = totalSeconds;
+      updateDisplay();
+      intervalId = setInterval(() => {
+        remainingSeconds--;
+        updateDisplay();
+        if (remainingSeconds <= 0) {
+          clearInterval(intervalId);
+          remainingSeconds = 0;
+          updateDisplay();
+          notifyUser();
+          toggleButtons(false);
+        }
+      }, 1000);
+      toggleButtons(true);
+    }
+
+    function stopTimer() {
+      clearInterval(intervalId);
+      remainingSeconds = 0;
+      updateDisplay();
+      toggleButtons(false);
+    }
+
+    function updateDisplay() {
+      const mins = String(Math.floor(remainingSeconds / 60)).padStart(2, '0');
+      const secs = String(remainingSeconds % 60).padStart(2, '0');
+      timerDisplay.textContent = `${mins}:${secs}`;
+    }
+
+    function toggleButtons(isRunning) {
+      buttons.forEach(btn => btn.disabled = isRunning);
+      stopBtn.disabled = !isRunning;
+    }
+
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.hasAttribute('data-minutes')) {
+          startTimer(parseInt(btn.getAttribute('data-minutes'), 10) * 60);
+        } else if (btn.hasAttribute('data-seconds')) {
+          startTimer(parseInt(btn.getAttribute('data-seconds'), 10));
+        }
+      });
+    });
+
+    stopBtn.addEventListener('click', stopTimer);
+  </script>
+</body>
+</html>
